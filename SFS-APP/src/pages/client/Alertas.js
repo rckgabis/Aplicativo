@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, Switch, TouchableOpacity } from 'react-native';
 import { useFonts, Montserrat_400Regular, Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 import { Feather, MaterialCommunityIcons, MaterialIcons, AntDesign, FontAwesome } from '@expo/vector-icons';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
@@ -13,6 +13,8 @@ const Alertas = () => {
   const [ipAddress, setIpAddress] = useState('');
   const [plan, setPlan] = useState('');
   const [serial, setSerial] = useState('');
+  const [ausenteSwitch, setAusenteSwitch] = useState(true);
+  const [sireneSwitch, setSireneSwitch] = useState(false);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -48,7 +50,7 @@ const Alertas = () => {
 
   const getUserPlanAndSerial = async () => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', 'userSerial')); // substitua 'userSerial' pelo identificador do usuário
+      const userDoc = await getDoc(doc(db, 'users', 'userSerial')); // Replace 'userSerial' with the actual user identifier
       if (userDoc.exists()) {
         const userSerial = userDoc.data().serial;
         setSerial(userSerial);
@@ -108,42 +110,48 @@ const Alertas = () => {
     {
       label: 'Pânico',
       color: '#cf0000',
-      icon: <Feather name="alert-triangle" size={30} color="#FFF" />,
+      icon: <Feather name="alert-triangle" size={30} color="#FFF" />, // Icon representing the button
       info: 'Botão de Pânico: Use em caso de emergência para solicitar ajuda imediata.',
       locked: false,
     },
     {
-      label: 'Ativar Sirene',
-      color: '#f15406',
-      icon: <MaterialCommunityIcons name="alarm-light-outline" size={30} color="#FFF" />,
+      label: sireneSwitch ? 'Desativar Sirene' : 'Ativar Sirene',
+      color: sireneSwitch ? '#008000' : '#f15406',
+      icon: <MaterialCommunityIcons name="alarm-light-outline" size={30} color="#FFF" />, // Icon representing the button
       info: 'Ativar Sirene: Use para ativar a sirene de alerta.',
       locked: false,
+      switch: sireneSwitch,
+      setSwitch: setSireneSwitch,
+      switchStyle: { marginTop: -10 },
     },
     {
       label: 'Alerta',
       color: '#fdab12',
-      icon: <Feather name="alert-circle" size={30} color="#FFF" />,
+      icon: <Feather name="alert-circle" size={30} color="#FFF" />, // Icon representing the button
       info: 'Alerta: Use para emitir um alerta geral.',
       locked: false,
     },
     {
-      label: 'Ausente',
-      color: '#808080',
-      icon: <Feather name="user-x" size={30} color="#FFF" />,
+      label: ausenteSwitch ? 'Presente' : 'Ausente',
+      color: ausenteSwitch ? '#008000' : '#808080',
+      icon: <Feather name="user-x" size={30} color="#FFF" />, // Icon representing the button
       info: 'Ausente: Use para indicar que está ausente do local.',
       locked: plan === 'basic',
+      switch: ausenteSwitch,
+      setSwitch: setAusenteSwitch,
+      switchStyle: { marginTop: -10 },
     },
     {
       label: 'Entrada Assistida',
       color: '#105587',
-      icon: <MaterialIcons name="camera-outdoor" size={30} color="#FFF" />,
+      icon: <MaterialIcons name="camera-outdoor" size={30} color="#FFF" />, // Icon representing the button
       info: 'Entrada Assistida: Use para solicitar assistência na entrada.',
       locked: plan === 'basic',
     },
     {
       label: 'Saída Assistida',
       color: '#800080',
-      icon: <MaterialIcons name="camera-outdoor" size={30} color="#FFF" />,
+      icon: <MaterialIcons name="camera-outdoor" size={30} color="#FFF" />, // Icon representing the button
       info: 'Saída Assistida: Use para solicitar assistência na saída.',
       locked: plan === 'basic',
     },
@@ -157,17 +165,36 @@ const Alertas = () => {
         <View style={styles.buttonContainer}>
           {alertButtons.map((button, index) => (
             <View key={index} style={styles.buttonWrapper}>
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: button.color, opacity: button.locked ? 0.5 : 1 }]}
-                onPress={() => !button.locked && handleAlert(button.label)}
-                disabled={button.locked}
-              >
-                <View style={styles.buttonContentCentered}>
-                  {button.icon}
-                  <Text style={styles.buttonText}>{button.label}</Text>
-                  {button.locked && <FontAwesome name="lock" size={20} color="#FFF" style={styles.lockIcon} />}
+              {button.switch !== undefined ? (
+                <View style={[styles.button, { backgroundColor: button.color, opacity: button.locked ? 0.5 : 1 }]}>
+                  <View style={styles.buttonContentCentered}>
+                    {button.icon}
+                    <Text style={styles.buttonText}>{button.label}</Text>
+                    {button.locked && <FontAwesome name="lock" size={20} color="#FFF" style={styles.lockIcon} />}
+                    <Switch
+                      value={button.switch}
+                      onValueChange={(value) => {
+                        button.setSwitch(value);
+                        if (button.label.includes('Sirene') && value) {
+                          handleAlert('Sirene Ativada');
+                        }
+                        if (button.label.includes('Presente') && !value) {
+                          handleAlert('Ausente');
+                        }
+                      }}
+                      style={button.switchStyle || { marginTop: 5 }}
+                    />
+                  </View>
                 </View>
-              </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={[styles.button, { backgroundColor: button.color, opacity: button.locked ? 0.5 : 1 }]} onPress={() => handleAlert(button.label)} disabled={button.locked}>
+                  <View style={styles.buttonContentCentered}>
+                    {button.icon}
+                    <Text style={styles.buttonText}>{button.label}</Text>
+                    {button.locked && <FontAwesome name="lock" size={20} color="#FFF" style={styles.lockIcon} />}
+                  </View>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => handleInfoPress(button.info)}>
                 <AntDesign name="questioncircleo" size={24} color="lightgray" style={{ marginTop: 5 }} />
               </TouchableOpacity>
@@ -216,7 +243,7 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '100%',
-    height: 90,
+    height: 120,
     padding: 10,
     borderRadius: 10,
     alignItems: 'center',
